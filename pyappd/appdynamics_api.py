@@ -26,6 +26,7 @@ class AppDynamicsApi:
                                     url,
                                     params=self.params, 
                                     auth=self.auth)
+        log.debug('Response: {}'.format(response))
         return map_from_json(operation, response.json())
 
     def get_applications(self):
@@ -37,7 +38,7 @@ class AppDynamicsApi:
         return self._make_request(operation)
 
     def get_tiers(self, app):
-        
+
         if hasattr(app, 'app_id'):
             app = app.app_id
 
