@@ -13,6 +13,10 @@ class Application:
         return Application(json_object, operation.api)
 
     def get_tiers(self):
+        """
+        Gets all tiers from this application
+
+        """
         return self.api.get_tiers(self)
 
     def __str__(self):
