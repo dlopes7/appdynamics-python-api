@@ -6,12 +6,10 @@ Core of the api.
 """
 import requests
 
-from .operations import Operation
-from .mapper import map_from_json
+from .models import Application, Tier, Dashboard, Operation
 
-from .models import Application, Tier, Dashboard
-
-from .logger import log
+from .utils.logger import log
+from .utils.mapper import map_from_json
 
 
 class AppDynamicsApi:
