@@ -9,9 +9,10 @@ import requests
 from .operations import Operation
 from .mapper import map_from_json
 
-from .models import Application, Tier
+from .models import Application, Tier, Dashboard
 
 from .logger import log
+
 
 class AppDynamicsApi:
     """
@@ -27,28 +28,52 @@ class AppDynamicsApi:
         self.tenant = tenant
         self.params = {'output': 'json'}
 
-    def _make_request(self, operation):
+    def _make_request(self, operation, internal=False):
         """
         Private method that takes in an Operation object and invokes the HTTP request
 
         :param operation: `Operation` that will be invoked.
         """
+        with requests.Session() as session:
+            log.debug('Executing operation %s', operation)
+            headers = {}
 
-        log.debug('Executing operation %s', operation)
-        url = '{}/{}'.format(self.controller_url, operation.uri)
-        response = requests.request(operation.method,
-                                    url,
-                                    params=self.params,
-                                    auth=self.auth)
-        log.debug('Response: %s', response)
-        return map_from_json(operation, response.json())
+            if internal:
+                cookie = self._login(session)
+                headers = {'X-CSRF-TOKEN': cookie,
+                           'accept': 'application/json'}
+
+            url = '{}/{}'.format(self.controller_url, operation.uri)
+            response = session.request(operation.method,
+                                       url,
+                                       params=self.params,
+                                       auth=self.auth,
+                                       headers=headers)
+            log.debug('Response: %s', response)
+
+            if response.status_code >= 400:
+                log.error('Error calling the api %s, URL: %s',
+                          response.status_code, url)
+                return []
+
+            return map_from_json(operation, response.json())
+
+    def _login(self, session):
+        url = '{}/{}'.format(self.controller_url, 'auth')
+        res = session.get(url, params={'action': 'login'}, auth=self.auth)
+        cookie = res.cookies['X-CSRF-TOKEN']
+        log.debug('Internal API, Login: %s, Cookie: %s',
+                  res, cookie)
+
+        return cookie
 
     def get_applications(self):
         """
         Gets all Business Applications from a controller
 
         """
-        operation = Operation('GET', 'controller/rest/applications', Application, api=self)
+        operation = Operation(
+            'GET', 'controller/rest/applications', Application, api=self)
         return self._make_request(operation)
 
     def get_application(self, app):
@@ -57,7 +82,8 @@ class AppDynamicsApi:
 
         :param application: Application Name or Application ID.
         """
-        operation = Operation('GET', 'controller/rest/applications/{}'.format(app), Application, api=self)
+        operation = Operation(
+            'GET', 'controller/rest/applications/{}'.format(app), Application, api=self)
         return self._make_request(operation)
 
     def get_tiers(self, app):
@@ -70,6 +96,11 @@ class AppDynamicsApi:
         if hasattr(app, 'app_id'):
             app = app.app_id
 
-        operation =  Operation('GET', 'controller/rest/applications/{}/tiers'.format(app), Tier, api=self)
+        operation = Operation(
+            'GET', 'controller/rest/applications/{}/tiers'.format(app), Tier, api=self)
         return self._make_request(operation)
-    
+
+    def get_dashboards(self):
+        operation = Operation(
+            'GET', 'controller/restui/dashboards/getAllDashboardsByType/false', Dashboard)
+        return self._make_request(operation, internal=True)
